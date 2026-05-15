@@ -1,0 +1,39 @@
+name: MiMo Video Assets Generator
+
+on:
+  workflow_dispatch:
+    inputs:
+      theme:
+        description: '视频主题 (例如：小猫嘲笑金毛太胖)'
+        required: true
+        default: '小猫和金毛讲笑话'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install dependencies
+      run: pip install requests
+
+    - name: Run MiMo Script
+      env:
+        MIMO_API_KEY: ${{ secrets.MIMO_API_KEY }}
+        VIDEO_THEME: ${{ github.event.inputs.theme }}
+      run: python mimo_script.py
+
+    - name: Upload Assets
+      uses: actions/upload-artifact@v4
+      with:
+        name: video-assets-${{ github.event.inputs.theme }}
+        path: |
+          script_and_prompt.json
+          output_audio/*.mp3
