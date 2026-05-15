@@ -1,66 +1,50 @@
 import requests
 import json
+import base64
+import os
 
-# 1. 配置你的 API 信息
-API_KEY = "你的小米MiMo_API_KEY"
-URL = "https://api.mimo.xiaomi.com/v2.5/chat/completions"
+# --- 配置 ---
+MIMO_API_KEY = "你的_MIMO_API_KEY"
+MIMO_BASE_URL = "https://api.xiaomimimo.com/v1"
 
-# 2. 定义你的题库 (这里可以放你的 30 道题)
-quiz_list = [
-    {
-        "id": 1,
-        "title": "副驾驶归属权",
-        "option_a": "必须是我的专属位置，别人坐我会炸毛",
-        "option_b": "只是个座位，普通异性同事坐也无所谓"
-    },
-    {
-        "id": 2,
-        "title": "前任社交边界",
-        "option_b": "完全断联，互删是基本尊重",
-        "option_a": "偶尔点赞，只要不私聊就没问题"
-    }
-    # ... 继续添加你的 30 道题
-]
-
-def generate_xhs_batch():
-    all_scripts = []
+def prepare_capcut_assets(theme):
+    headers = {"Authorization": f"Bearer {MIMO_API_KEY}", "Content-Type": "application/json"}
     
-    for item in quiz_list:
-        print(f"正在处理题目：{item['title']}...")
+    # 1. 让 MiMo 写剧本并明确画面描述
+    script_payload = {
+        "model": "mimo-v2.5-pro",
+        "messages": [{
+            "role": "user", 
+            "content": f"写一个'{theme}'的短视频剧本。角色：小猫(女声,橘色德文猫)、狗子(男声,大金毛)。输出JSON，包含对话列表和一段详细的视频描述词。"
+        }],
+        "response_format": {"type": "json_object"}
+    }
+    
+    res = requests.post(f"{MIMO_BASE_URL}/chat/completions", json=script_payload, headers=headers)
+    data = json.loads(res.json()['choices'][0]['message']['content'])
+    
+    print(f"🎬 视频提示词（去即梦生成这个）：\n{data['video_prompt']}\n")
+
+    # 2. 生成配音文件，方便在剪映里排列
+    for i, item in enumerate(data['dialogue']):
+        # 根据角色分配 MiMo-TTS 音色
+        voice = "mimo_female_cute" if "猫" in item['role'] else "mimo_male_gentle"
         
-        # 3. 构造 Prompt，直接代入变量
-        prompt = f"""
-        你是一个拥有百万粉丝的小红书情感博主。
-        我们要针对《镜像坦白局》这个测试做引流。
-        
-        题目：{item['title']}
-        分歧点：一方认为“{item['option_a']}”，另一方认为“{item['option_b']}”。
-        
-        请生成一个短视频脚本：
-        1. [标题] 要带“价值观碰撞”、“情侣必看”等关键词。
-        2. [第一幕] 还原一个具体的吵架或尴尬场景。
-        3. [第二幕] 用扎心的语言分析两人的底层逻辑差异。
-        4. [结尾] 引导：‘想知道你们的镜像同步率吗？点击链接测一测’。
-        """
-        
-        payload = {
-            "model": "mimLM-v2.5-pro",
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.8  # 调高一点，让文案更有创意
+        tts_payload = {
+            "model": "mimo-v2.5-tts",
+            "modalities": ["text", "audio"],
+            "audio": {"voice": voice, "format": "mp3"},
+            "messages": [{"role": "assistant", "content": item['text']}]
         }
         
-        headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
+        tts_res = requests.post(f"{MIMO_BASE_URL}/chat/completions", json=tts_payload, headers=headers)
+        audio_data = base64.b64decode(tts_res.json()['choices'][0]['message']['audio']['data'])
         
-        response = requests.post(URL, json=payload, headers=headers)
-        script_content = response.json()['choices'][0]['message']['content']
-        
-        all_scripts.append({"id": item['id'], "script": script_content})
-
-    # 4. 将所有生成的脚本保存为本地文件
-    with open("xhs_scripts_batch.json", "w", encoding="utf-8") as f:
-        json.dump(all_scripts, f, ensure_ascii=False, indent=4)
-    
-    print("✨ 30套爆款脚本生成完毕！请查看 xhs_scripts_batch.json")
+        # 文件命名加上序号，方便在剪映里按顺序排列
+        filename = f"{i+1}_{item['role']}.mp3"
+        with open(filename, "wb") as f:
+            f.write(audio_data)
+        print(f"🔊 已生成配音：{filename}")
 
 if __name__ == "__main__":
-    generate_xhs_batch()
+    prepare_capcut_assets("猫咪吐槽金毛掉毛太多")
