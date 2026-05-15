@@ -4,8 +4,9 @@ import base64
 import os
 
 # --- 配置 ---
-MIMO_API_KEY = "你的_MIMO_API_KEY"
-MIMO_BASE_URL = "https://api.xiaomimimo.com/v1"
+# 1. 从 GitHub Secrets 环境变量中安全读取 API KEY
+API_KEY = os.getenv("MIMO_API_KEY") 
+URL = "https://token-plan-cn.xiaomimimo.com/v1/chat/completions"
 
 def prepare_capcut_assets(theme):
     headers = {"Authorization": f"Bearer {MIMO_API_KEY}", "Content-Type": "application/json"}
